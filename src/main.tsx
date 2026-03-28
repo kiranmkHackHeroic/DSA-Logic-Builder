@@ -1,6 +1,5 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App.tsx";
 import "./index.css";
 
 const rootElement = document.getElementById("root");
@@ -13,8 +12,10 @@ const missingSupabaseEnv =
   !import.meta.env.VITE_SUPABASE_URL ||
   !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-if (missingSupabaseEnv) {
-  createRoot(rootElement).render(
+const root = createRoot(rootElement);
+
+const renderStartupError = (message: string) => {
+  root.render(
     <div
       style={{
         minHeight: "100vh",
@@ -27,21 +28,28 @@ if (missingSupabaseEnv) {
     >
       <div>
         <h1 style={{ marginBottom: "8px" }}>Configuration Error</h1>
-        <p style={{ margin: 0 }}>
-          Missing Supabase environment variables. Set
-          <code> VITE_SUPABASE_URL </code>
-          and
-          <code> VITE_SUPABASE_PUBLISHABLE_KEY </code>
-          in your environment and redeploy.
-        </p>
+        <p style={{ margin: 0 }}>{message}</p>
       </div>
     </div>
   );
-} else {
-  // Enable strict mode for better development warnings
-  createRoot(rootElement).render(
-    <StrictMode>
-      <App />
-    </StrictMode>
+};
+
+if (missingSupabaseEnv) {
+  renderStartupError(
+    "Missing Supabase environment variables. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in your environment and redeploy."
   );
+} else {
+  import("./App.tsx")
+    .then(({ default: App }) => {
+      // Enable strict mode for better development warnings
+      root.render(
+        <StrictMode>
+          <App />
+        </StrictMode>
+      );
+    })
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : "Unknown startup error";
+      renderStartupError(`App startup failed: ${message}`);
+    });
 }

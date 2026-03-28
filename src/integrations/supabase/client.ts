@@ -2,8 +2,25 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const normalizeEnvValue = (value: string | undefined) => {
+  if (!value) return "";
+  const trimmed = value.trim();
+  return trimmed.replace(/^"(.*)"$/, "$1").replace(/^'(.*)'$/, "$1");
+};
+
+const SUPABASE_URL = normalizeEnvValue(import.meta.env.VITE_SUPABASE_URL);
+const SUPABASE_PUBLISHABLE_KEY = normalizeEnvValue(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  throw new Error("Missing Supabase environment values. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.");
+}
+
+try {
+  // Validate URL early so misconfigured env values fail with a clear message.
+  new URL(SUPABASE_URL);
+} catch {
+  throw new Error("Invalid VITE_SUPABASE_URL. Ensure it is a valid URL like https://your-project-ref.supabase.co");
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
