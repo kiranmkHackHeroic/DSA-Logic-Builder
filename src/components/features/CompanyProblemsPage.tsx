@@ -14,120 +14,83 @@ import {
   Search,
   ExternalLink,
   TrendingUp,
+  Check,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import FeatureLayout from "@/components/layout/FeatureLayout";
-
-// Company data with problem counts
-const COMPANIES = [
-  { id: "google", name: "Google", logo: "🔍", problems: 450, color: "bg-blue-500/10 text-blue-500" },
-  { id: "amazon", name: "Amazon", logo: "📦", problems: 380, color: "bg-orange-500/10 text-orange-500" },
-  { id: "meta", name: "Meta", logo: "👤", problems: 320, color: "bg-blue-600/10 text-blue-600" },
-  { id: "apple", name: "Apple", logo: "🍎", problems: 250, color: "bg-gray-500/10 text-gray-700" },
-  { id: "microsoft", name: "Microsoft", logo: "🪟", problems: 340, color: "bg-cyan-500/10 text-cyan-500" },
-  { id: "netflix", name: "Netflix", logo: "🎬", problems: 120, color: "bg-red-500/10 text-red-500" },
-  { id: "uber", name: "Uber", logo: "🚗", problems: 180, color: "bg-gray-800/10 text-gray-800" },
-  { id: "airbnb", name: "Airbnb", logo: "🏠", problems: 150, color: "bg-pink-500/10 text-pink-500" },
-  { id: "linkedin", name: "LinkedIn", logo: "💼", problems: 200, color: "bg-blue-700/10 text-blue-700" },
-  { id: "twitter", name: "Twitter", logo: "🐦", problems: 130, color: "bg-sky-500/10 text-sky-500" },
-  { id: "bloomberg", name: "Bloomberg", logo: "📊", problems: 220, color: "bg-amber-500/10 text-amber-500" },
-  { id: "salesforce", name: "Salesforce", logo: "☁️", problems: 160, color: "bg-blue-400/10 text-blue-400" },
-];
-
-// Mock problems with company tags
-const PROBLEMS_WITH_COMPANIES = [
-  {
-    id: 1,
-    title: "Two Sum",
-    difficulty: "easy" as const,
-    pattern: "Hash Map",
-    companies: ["google", "amazon", "meta", "apple", "microsoft"],
-    frequency: 95,
-  },
-  {
-    id: 2,
-    title: "Valid Parentheses",
-    difficulty: "easy" as const,
-    pattern: "Stack",
-    companies: ["amazon", "meta", "bloomberg"],
-    frequency: 88,
-  },
-  {
-    id: 3,
-    title: "Merge Intervals",
-    difficulty: "medium" as const,
-    pattern: "Intervals",
-    companies: ["google", "meta", "uber", "linkedin"],
-    frequency: 82,
-  },
-  {
-    id: 4,
-    title: "LRU Cache",
-    difficulty: "medium" as const,
-    pattern: "Design",
-    companies: ["amazon", "microsoft", "google", "netflix"],
-    frequency: 90,
-  },
-  {
-    id: 5,
-    title: "Trapping Rain Water",
-    difficulty: "hard" as const,
-    pattern: "Two Pointers",
-    companies: ["google", "amazon", "apple", "bloomberg"],
-    frequency: 75,
-  },
-  {
-    id: 6,
-    title: "Word Break",
-    difficulty: "medium" as const,
-    pattern: "Dynamic Programming",
-    companies: ["meta", "amazon", "uber"],
-    frequency: 78,
-  },
-  {
-    id: 7,
-    title: "Number of Islands",
-    difficulty: "medium" as const,
-    pattern: "Graph/BFS",
-    companies: ["amazon", "google", "microsoft", "meta"],
-    frequency: 92,
-  },
-  {
-    id: 8,
-    title: "Reverse Linked List",
-    difficulty: "easy" as const,
-    pattern: "Linked List",
-    companies: ["amazon", "microsoft", "apple"],
-    frequency: 85,
-  },
-];
+import {
+  COMPANY_LOGOS,
+  COMPANY_PROBLEMS,
+  STRIVER_CONCEPTS,
+  type CompanyProblem,
+} from "@/data/companyProblems";
 
 type SortOption = "frequency" | "difficulty";
+
+const CompanyLogo = ({
+  name,
+  logoUrl,
+  size = "large",
+}: {
+  name: string;
+  logoUrl: string;
+  size?: "small" | "large";
+}) => {
+  const classes =
+    size === "small"
+      ? "w-6 h-6 rounded-full"
+      : "w-12 h-12 rounded-xl";
+
+  return (
+    <img
+      src={logoUrl}
+      alt={`${name} logo`}
+      className={`${classes} object-contain bg-background border p-1`}
+      loading="lazy"
+      onError={(e) => {
+        const target = e.currentTarget;
+        target.style.display = "none";
+      }}
+    />
+  );
+};
 
 const CompanyProblemsPage = () => {
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>("all");
+  const [selectedConcept, setSelectedConcept] = useState<string>("all");
+  const [striverOnly, setStriverOnly] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("frequency");
 
-  const filteredProblems = PROBLEMS_WITH_COMPANIES.filter((problem) => {
+  const filteredProblems = COMPANY_PROBLEMS.filter((problem) => {
     const matchesCompany =
       !selectedCompany || problem.companies.includes(selectedCompany);
     const matchesDifficulty =
       selectedDifficulty === "all" || problem.difficulty === selectedDifficulty;
+    const matchesConcept =
+      selectedConcept === "all" || problem.concept === selectedConcept;
+    const matchesSheet = !striverOnly || problem.striverSheet;
     const matchesSearch =
       !searchQuery ||
       problem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      problem.pattern.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCompany && matchesDifficulty && matchesSearch;
+      problem.concept.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCompany && matchesDifficulty && matchesConcept && matchesSheet && matchesSearch;
   }).sort((a, b) => {
     if (sortBy === "frequency") return b.frequency - a.frequency;
     const diffOrder = { easy: 0, medium: 1, hard: 2 };
     return diffOrder[a.difficulty] - diffOrder[b.difficulty];
   });
 
-  const selectedCompanyData = COMPANIES.find((c) => c.id === selectedCompany);
+  const selectedCompanyData = COMPANY_LOGOS.find((c) => c.id === selectedCompany);
+
+  const getProblemRoute = (problem: CompanyProblem) => {
+    if (problem.localProblemId) {
+      return `/problems/${problem.localProblemId}`;
+    }
+    return problem.leetcodeUrl || "#";
+  };
 
   return (
     <div className="space-y-6">
@@ -138,13 +101,13 @@ const CompanyProblemsPage = () => {
           Company Problems
         </h1>
         <p className="text-muted-foreground">
-          Practice problems frequently asked by top tech companies
+          Practice company-wise problems with Striver sheet concept mapping
         </p>
       </div>
 
       {/* Company Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {COMPANIES.map((company) => (
+        {COMPANY_LOGOS.map((company) => (
           <Card
             key={company.id}
             className={`cursor-pointer transition-all hover:border-primary/50 ${
@@ -157,7 +120,9 @@ const CompanyProblemsPage = () => {
             }
           >
             <CardContent className="pt-4 text-center">
-              <span className="text-3xl mb-2 block">{company.logo}</span>
+              <div className="flex justify-center mb-2">
+                <CompanyLogo name={company.name} logoUrl={company.logoUrl} />
+              </div>
               <h3 className="font-semibold text-sm">{company.name}</h3>
               <p className="text-xs text-muted-foreground">
                 {company.problems} problems
@@ -173,7 +138,7 @@ const CompanyProblemsPage = () => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <span className="text-4xl">{selectedCompanyData.logo}</span>
+                <CompanyLogo name={selectedCompanyData.name} logoUrl={selectedCompanyData.logoUrl} />
                 <div>
                   <h2 className="text-xl font-bold">{selectedCompanyData.name}</h2>
                   <p className="text-sm opacity-80">
@@ -221,6 +186,19 @@ const CompanyProblemsPage = () => {
                 <SelectItem value="hard">Hard</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={selectedConcept} onValueChange={setSelectedConcept}>
+              <SelectTrigger className="w-56">
+                <SelectValue placeholder="Concept" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Concepts</SelectItem>
+                {STRIVER_CONCEPTS.map((concept) => (
+                  <SelectItem key={concept} value={concept}>
+                    {concept}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="Sort by" />
@@ -230,6 +208,15 @@ const CompanyProblemsPage = () => {
                 <SelectItem value="difficulty">Difficulty</SelectItem>
               </SelectContent>
             </Select>
+            <Button
+              type="button"
+              variant={striverOnly ? "default" : "outline"}
+              onClick={() => setStriverOnly((prev) => !prev)}
+              className="gap-2"
+            >
+              <Check className="h-4 w-4" />
+              Striver Sheet
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -254,8 +241,13 @@ const CompanyProblemsPage = () => {
                         {problem.difficulty}
                       </Badge>
                       <span className="text-xs text-muted-foreground">
-                        {problem.pattern}
+                          {problem.concept}
                       </span>
+                        {problem.striverSheet && (
+                          <Badge variant="outline" className="text-xs">
+                            Striver
+                          </Badge>
+                        )}
                     </div>
                   </div>
                 </div>
@@ -266,14 +258,18 @@ const CompanyProblemsPage = () => {
                   </div>
                   <div className="flex -space-x-1">
                     {problem.companies.slice(0, 4).map((companyId) => {
-                      const company = COMPANIES.find((c) => c.id === companyId);
+                      const company = COMPANY_LOGOS.find((c) => c.id === companyId);
                       return (
                         <div
                           key={companyId}
-                          className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center border-2 border-background text-xs"
+                          className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center border-2 border-background text-[10px] overflow-hidden"
                           title={company?.name}
                         >
-                          {company?.logo}
+                          {company ? (
+                            <CompanyLogo name={company.name} logoUrl={company.logoUrl} size="small" />
+                          ) : (
+                            companyId.slice(0, 1).toUpperCase()
+                          )}
                         </div>
                       );
                     })}
@@ -283,11 +279,12 @@ const CompanyProblemsPage = () => {
                       </div>
                     )}
                   </div>
-                  <Link to={`/problems/${problem.id}`}>
+                  <Link to={getProblemRoute(problem)} target={problem.localProblemId ? undefined : "_blank"} rel={problem.localProblemId ? undefined : "noreferrer"}>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      title={problem.localProblemId ? "Open guided page" : "Open problem link"}
                     >
                       <ExternalLink className="h-4 w-4" />
                     </Button>
