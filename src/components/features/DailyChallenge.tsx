@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useLocalStorage } from "@/hooks/useUtils";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface DailyChallengeData {
   date: string;
@@ -46,11 +47,15 @@ const getTodayChallenge = () => {
 };
 
 const DailyChallenge = () => {
+  const { user } = useAuth();
+  const challengeHistoryStorageKey = `daily-challenge-history:${user?.id ?? "guest"}`;
+  const challengeStreakStorageKey = `daily-challenge-streak:${user?.id ?? "guest"}`;
+
   const [timeRemaining, setTimeRemaining] = useState("");
   const [challengeHistory, setChallengeHistory] = useLocalStorage<
     Record<string, DailyChallengeData>
-  >("daily-challenge-history", {});
-  const [streak, setStreak] = useLocalStorage("daily-challenge-streak", 0);
+  >(challengeHistoryStorageKey, {});
+  const [streak, setStreak] = useLocalStorage(challengeStreakStorageKey, 0);
 
   const today = new Date().toISOString().split("T")[0];
   const todayChallenge = getTodayChallenge();

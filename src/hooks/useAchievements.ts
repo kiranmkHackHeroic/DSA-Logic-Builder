@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useLocalStorage } from "@/hooks/useUtils";
+import { useAuth } from "@/contexts/AuthContext";
 
 /**
  * Achievement and Badge system for gamification
@@ -234,9 +235,12 @@ export const TIER_BG_COLORS = {
  * Hook for managing achievements
  */
 export function useAchievements() {
+  const { user } = useAuth();
+  const achievementStorageKey = `user-achievements:${user?.id ?? "guest"}`;
+
   const [userAchievements, setUserAchievements] = useLocalStorage<
     Record<string, UserAchievement>
-  >("user-achievements", {});
+  >(achievementStorageKey, {});
 
   // Check if achievement is unlocked
   const isUnlocked = useCallback(

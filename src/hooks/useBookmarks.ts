@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useLocalStorage } from "@/hooks/useUtils";
+import { useAuth } from "@/contexts/AuthContext";
 
 /**
  * Bookmark and Notes system for problems
@@ -35,8 +36,11 @@ export const BOOKMARK_TAGS: { value: BookmarkTag; label: string; color: string }
  * Hook for managing bookmarks and notes
  */
 export function useBookmarks() {
+  const { user } = useAuth();
+  const bookmarkStorageKey = `problem-bookmarks:${user?.id ?? "guest"}`;
+
   const [bookmarks, setBookmarks] = useLocalStorage<Record<string, Bookmark>>(
-    "problem-bookmarks",
+    bookmarkStorageKey,
     {}
   );
 

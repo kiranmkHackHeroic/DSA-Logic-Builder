@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 /**
  * Hook for managing local storage with type safety
@@ -20,6 +20,22 @@ export function useLocalStorage<T>(
       return initialValue;
     }
   });
+
+  // Re-read storage when the key changes (e.g., user switches accounts).
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      setStoredValue(initialValue);
+      return;
+    }
+
+    try {
+      const item = window.localStorage.getItem(key);
+      setStoredValue(item ? JSON.parse(item) : initialValue);
+    } catch (error) {
+      console.warn(`Error reading localStorage key "${key}":`, error);
+      setStoredValue(initialValue);
+    }
+  }, [key, initialValue]);
 
   // Persist to localStorage
   const setValue = useCallback(

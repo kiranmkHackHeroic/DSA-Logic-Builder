@@ -18,6 +18,7 @@ import {
 import { studyPlans, StudyPlan } from "@/data/studyPlans";
 import { useLocalStorage } from "@/hooks/useUtils";
 import FeatureLayout from "@/components/layout/FeatureLayout";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface StudyPlanProgress {
   planId: string;
@@ -133,10 +134,12 @@ const StudyPlanCard = ({
 };
 
 const StudyPlansPage = () => {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null);
+  const studyPlanStorageKey = `study-plan-progress:${user?.id ?? "guest"}`;
   const [planProgress, setPlanProgress] = useLocalStorage<Record<string, StudyPlanProgress>>(
-    "study-plan-progress",
+    studyPlanStorageKey,
     {}
   );
 

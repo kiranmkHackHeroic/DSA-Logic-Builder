@@ -130,6 +130,10 @@ export const SubscriptionProvider = ({ children }: SubscriptionProviderProps) =>
   const [isLoading, setIsLoading] = useState(true);
   const [problemsSolvedToday, setProblemsSolvedToday] = useState(0);
 
+  const subscriptionStorageKey = `user-subscription:${user?.id ?? "guest"}`;
+  const today = new Date().toISOString().split("T")[0];
+  const problemsSolvedStorageKey = `problems-solved:${user?.id ?? "guest"}:${today}`;
+
   const subscription = PLANS.find((p) => p.id === plan) || PLANS[0];
 
   // Load subscription from localStorage or database
@@ -138,23 +142,26 @@ export const SubscriptionProvider = ({ children }: SubscriptionProviderProps) =>
       setIsLoading(true);
       
       // Check localStorage first (for demo purposes)
-      const savedPlan = localStorage.getItem("user-subscription");
+      const savedPlan = localStorage.getItem(subscriptionStorageKey);
       if (savedPlan) {
         setPlan(savedPlan as PlanType);
+      } else {
+        setPlan("free");
       }
 
       // Load problems solved today
-      const today = new Date().toISOString().split("T")[0];
-      const savedProblems = localStorage.getItem(`problems-solved-${today}`);
+      const savedProblems = localStorage.getItem(problemsSolvedStorageKey);
       if (savedProblems) {
         setProblemsSolvedToday(parseInt(savedProblems, 10));
+      } else {
+        setProblemsSolvedToday(0);
       }
 
       setIsLoading(false);
     };
 
     loadSubscription();
-  }, [user]);
+  }, [subscriptionStorageKey, problemsSolvedStorageKey, user]);
 
   // Check if user can access a feature
   const canAccess = (feature: keyof Plan["limits"]): boolean => {
@@ -176,13 +183,13 @@ export const SubscriptionProvider = ({ children }: SubscriptionProviderProps) =>
     // In production, this would redirect to Stripe Checkout
     // For demo, we'll just set the plan
     setPlan(planId);
-    localStorage.setItem("user-subscription", planId);
+    localStorage.setItem(subscriptionStorageKey, planId);
   };
 
   // Cancel subscription
   const cancelSubscription = async (): Promise<void> => {
     setPlan("free");
-    localStorage.setItem("user-subscription", "free");
+    localStorage.setItem(subscriptionStorageKey, "free");
   };
 
   return (

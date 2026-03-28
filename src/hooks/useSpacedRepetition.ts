@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { useLocalStorage } from "@/hooks/useUtils";
+import { useAuth } from "@/contexts/AuthContext";
 
 /**
  * Spaced Repetition System using SM-2 algorithm
@@ -89,8 +90,11 @@ function calculateNextReview(
  * Hook for managing spaced repetition reviews
  */
 export function useSpacedRepetition() {
+  const { user } = useAuth();
+  const spacedRepetitionStorageKey = `srs-cards:${user?.id ?? "guest"}`;
+
   const [cards, setCards] = useLocalStorage<Record<string, ReviewCard>>(
-    "srs-cards",
+    spacedRepetitionStorageKey,
     {}
   );
 
