@@ -8,6 +8,8 @@ import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserStreak } from "@/hooks/useUserStreak";
 import { useAllProgress } from "@/hooks/useProblemProgress";
+import { getProblemById } from "@/data/problems";
+import { COMPANY_PROBLEMS } from "@/data/companyProblems";
 import { 
   Brain, 
   Target, 
@@ -60,20 +62,74 @@ const Analytics = () => {
     ? Math.round(completedProblems.reduce((sum, p) => sum + (p.time_spent_coding || 0), 0) / completedProblems.length)
     : 0;
 
-  const patternData = [
-    { name: "Two Pointers", mastery: 85, problems: 8, color: "primary" },
-    { name: "Sliding Window", mastery: 60, problems: 5, color: "accent" },
-    { name: "Binary Search", mastery: 45, problems: 4, color: "success" },
-    { name: "Dynamic Programming", mastery: 25, problems: 3, color: "warning" },
-    { name: "Stack", mastery: 90, problems: 6, color: "primary" },
-    { name: "Greedy", mastery: 70, problems: 4, color: "accent" },
+  const resolvePattern = (problemId: string) => {
+    const numericId = Number(problemId);
+
+    if (problemId.startsWith("company-")) {
+      const companyId = Number(problemId.replace("company-", ""));
+      const companyProblem = COMPANY_PROBLEMS.find((item) => item.id === companyId);
+      return companyProblem?.concept || "General";
+    }
+
+    if (Number.isFinite(numericId)) {
+      const internalProblem = getProblemById(numericId);
+      if (internalProblem?.pattern) return internalProblem.pattern;
+
+      const companyProblem = COMPANY_PROBLEMS.find((item) => item.localProblemId === numericId);
+      if (companyProblem?.concept) return companyProblem.concept;
+    }
+
+    return "General";
+  };
+
+  const patternAttempts = allProgress?.reduce<Record<string, number>>((acc, item) => {
+    const key = resolvePattern(item.problem_id);
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {}) || {};
+
+  const patternCompletions = completedProblems.reduce<Record<string, number>>((acc, item) => {
+    const key = resolvePattern(item.problem_id);
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  const colorCycle: Array<"primary" | "accent" | "success" | "warning"> = [
+    "primary",
+    "accent",
+    "success",
+    "warning",
   ];
 
-  const weakAreas = [
-    { area: "Edge case handling", score: 45, suggestion: "Practice more problems with tricky edge cases" },
-    { area: "Space optimization", score: 55, suggestion: "Focus on in-place algorithms and space reduction" },
-    { area: "Time complexity analysis", score: 60, suggestion: "Review Big O notation and practice estimation" },
-  ];
+  const patternData = Object.keys(patternAttempts)
+    .map((name, index) => {
+      const attempts = patternAttempts[name] || 0;
+      const solved = patternCompletions[name] || 0;
+      const mastery = attempts > 0 ? Math.round((solved / attempts) * 100) : 0;
+      return {
+        name,
+        mastery,
+        problems: attempts,
+        color: colorCycle[index % colorCycle.length],
+      };
+    })
+    .sort((a, b) => b.problems - a.problems)
+    .slice(0, 6);
+
+  const weakAreas = patternData
+    .filter((item) => item.problems > 0)
+    .sort((a, b) => a.mastery - b.mastery)
+    .slice(0, 3)
+    .map((item) => ({
+      area: item.name,
+      score: item.mastery,
+      suggestion:
+        item.mastery < 40
+          ? "Solve 3-5 more guided problems in this pattern."
+          : item.mastery < 70
+            ? "Focus on edge cases and complexity trade-offs."
+            : "Keep consistency with timed practice rounds.",
+    }));
 
   const totalTime = avgThinkingTime + avgCodingTime;
   const thinkingPercentage = totalTime > 0 ? Math.round((avgThinkingTime / totalTime) * 100) : 50;
@@ -149,25 +205,31 @@ const Analytics = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {patternData.map((pattern) => (
-                    <div key={pattern.name}>
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{pattern.name}</span>
-                          <Badge variant="secondary" className="text-xs">
-                            {pattern.problems} problems
-                          </Badge>
+                {patternData.length > 0 ? (
+                  <div className="space-y-4">
+                    {patternData.map((pattern) => (
+                      <div key={pattern.name}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{pattern.name}</span>
+                            <Badge variant="secondary" className="text-xs">
+                              {pattern.problems} problems
+                            </Badge>
+                          </div>
+                          <span className="text-sm font-medium">{pattern.mastery}%</span>
                         </div>
-                        <span className="text-sm font-medium">{pattern.mastery}%</span>
+                        <Progress 
+                          value={pattern.mastery} 
+                          variant={pattern.color as "primary" | "accent" | "success" | "warning"}
+                        />
                       </div>
-                      <Progress 
-                        value={pattern.mastery} 
-                        variant={pattern.color as "primary" | "accent" | "success" | "warning"}
-                      />
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No solved or attempted patterns yet. Start a problem to see pattern mastery.
+                  </p>
+                )}
               </CardContent>
             </Card>
 
@@ -230,18 +292,24 @@ const Analytics = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {weakAreas.map((area) => (
-                    <div key={area.area} className="bg-warning/5 border border-warning/20 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium">{area.area}</span>
-                        <Badge variant="warning">{area.score}%</Badge>
+                {weakAreas.length > 0 ? (
+                  <div className="space-y-4">
+                    {weakAreas.map((area) => (
+                      <div key={area.area} className="bg-warning/5 border border-warning/20 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium">{area.area}</span>
+                          <Badge variant="warning">{area.score}%</Badge>
+                        </div>
+                        <Progress value={area.score} variant="warning" size="sm" className="mb-2" />
+                        <p className="text-sm text-muted-foreground">{area.suggestion}</p>
                       </div>
-                      <Progress value={area.score} variant="warning" size="sm" className="mb-2" />
-                      <p className="text-sm text-muted-foreground">{area.suggestion}</p>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No weak areas yet. Complete a few problems to get personalized improvement insights.
+                  </p>
+                )}
               </CardContent>
             </Card>
 
