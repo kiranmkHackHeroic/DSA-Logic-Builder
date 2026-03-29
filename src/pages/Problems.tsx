@@ -37,6 +37,7 @@ const problems = COMPANY_PROBLEMS.filter((problem) => problem.striverSheet).map(
   pattern: problem.concept,
   companies: problem.companies,
   localProblemId: problem.localProblemId,
+  routeId: problem.localProblemId ? String(problem.localProblemId) : `company-${problem.id}`,
   leetcodeUrl: problem.leetcodeUrl || buildLeetCodeUrl(problem.title),
 }));
 
@@ -56,9 +57,9 @@ const Problems = () => {
     });
   }
 
-  const getStatus = (localProblemId?: number) => {
-    if (!user || !localProblemId) return "pending";
-    const dbStatus = progressMap.get(String(localProblemId));
+  const getStatus = (routeId: string) => {
+    if (!user) return "pending";
+    const dbStatus = progressMap.get(routeId);
     if (dbStatus === "completed") return "completed";
     if (dbStatus === "in_progress" || dbStatus === "in-progress") return "in-progress";
     return "pending";
@@ -75,8 +76,8 @@ const Problems = () => {
     return matchesSearch && matchesDifficulty && matchesPattern;
   });
 
-  const completed = problems.filter((p) => getStatus(p.localProblemId) === "completed").length;
-  const inProgress = problems.filter((p) => getStatus(p.localProblemId) === "in-progress").length;
+  const completed = problems.filter((p) => getStatus(p.routeId) === "completed").length;
+  const inProgress = problems.filter((p) => getStatus(p.routeId) === "in-progress").length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -188,109 +189,71 @@ const Problems = () => {
 
           <div className="space-y-3">
             {filteredProblems.map((problem) => {
-              const status = getStatus(problem.localProblemId);
-              const internalPath = problem.localProblemId ? `/problems/${problem.localProblemId}` : null;
-              const externalPath = !problem.localProblemId ? problem.leetcodeUrl : null;
+              const status = getStatus(problem.routeId);
+              const internalPath = `/problems/${problem.routeId}`;
 
               return (
                 <Card key={problem.id} variant="interactive" className="group">
                   <CardContent className="py-4">
-                    {internalPath ? (
-                      <div className="flex items-center justify-between">
-                        <Link to={internalPath} className="flex-1 min-w-0">
-                          <div className="flex items-center gap-4">
-                            <div
-                              className={`
-                                w-10 h-10 rounded-lg flex items-center justify-center
-                                ${
-                                  status === "completed"
-                                    ? "bg-success/10"
-                                    : status === "in-progress"
-                                      ? "bg-warning/10"
-                                      : "bg-muted"
-                                }
-                              `}
-                            >
-                              {status === "completed" ? (
-                                <CheckCircle className="h-5 w-5 text-success" />
-                              ) : status === "in-progress" ? (
-                                <Clock className="h-5 w-5 text-warning" />
-                              ) : (
-                                <Target className="h-5 w-5 text-muted-foreground" />
-                              )}
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-3">
-                                <p className="font-semibold group-hover:text-primary transition-colors">
-                                  {problem.id}. {problem.title}
-                                </p>
-                                <Badge variant={problem.difficulty}>{problem.difficulty}</Badge>
-                              </div>
-                              <div className="flex items-center gap-4 mt-1">
-                                <span className="text-sm text-muted-foreground flex items-center gap-1">
-                                  <BookOpen className="h-3 w-3" />
-                                  {problem.pattern}
-                                </span>
-                                <div className="flex gap-1">
-                                  {problem.companies.slice(0, 2).map((company) => (
-                                    <Badge key={company} variant="secondary" className="text-xs">
-                                      {formatCompanyName(company)}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </Link>
-                        <div className="flex items-center gap-2 ml-3">
-                          <a
-                            href={problem.leetcodeUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label={`Open ${problem.title} on LeetCode`}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-secondary transition-colors"
+                    <div className="flex items-center justify-between">
+                      <Link to={internalPath} className="flex-1 min-w-0">
+                        <div className="flex items-center gap-4">
+                          <div
+                            className={`
+                              w-10 h-10 rounded-lg flex items-center justify-center
+                              ${
+                                status === "completed"
+                                  ? "bg-success/10"
+                                  : status === "in-progress"
+                                    ? "bg-warning/10"
+                                    : "bg-muted"
+                              }
+                            `}
                           >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                          <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                        </div>
-                      </div>
-                    ) : externalPath ? (
-                      <a href={externalPath} target="_blank" rel="noopener noreferrer" className="block">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-muted">
+                            {status === "completed" ? (
+                              <CheckCircle className="h-5 w-5 text-success" />
+                            ) : status === "in-progress" ? (
+                              <Clock className="h-5 w-5 text-warning" />
+                            ) : (
                               <Target className="h-5 w-5 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-3">
+                              <p className="font-semibold group-hover:text-primary transition-colors">
+                                {problem.id}. {problem.title}
+                              </p>
+                              <Badge variant={problem.difficulty}>{problem.difficulty}</Badge>
                             </div>
-                            <div>
-                              <div className="flex items-center gap-3">
-                                <p className="font-semibold group-hover:text-primary transition-colors">
-                                  {problem.id}. {problem.title}
-                                </p>
-                                <Badge variant={problem.difficulty}>{problem.difficulty}</Badge>
-                                <Badge variant="secondary" className="text-xs">
-                                  External
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-4 mt-1">
-                                <span className="text-sm text-muted-foreground flex items-center gap-1">
-                                  <BookOpen className="h-3 w-3" />
-                                  {problem.pattern}
-                                </span>
-                                <div className="flex gap-1">
-                                  {problem.companies.slice(0, 2).map((company) => (
-                                    <Badge key={company} variant="secondary" className="text-xs">
-                                      {formatCompanyName(company)}
-                                    </Badge>
-                                  ))}
-                                </div>
+                            <div className="flex items-center gap-4 mt-1">
+                              <span className="text-sm text-muted-foreground flex items-center gap-1">
+                                <BookOpen className="h-3 w-3" />
+                                {problem.pattern}
+                              </span>
+                              <div className="flex gap-1">
+                                {problem.companies.slice(0, 2).map((company) => (
+                                  <Badge key={company} variant="secondary" className="text-xs">
+                                    {formatCompanyName(company)}
+                                  </Badge>
+                                ))}
                               </div>
                             </div>
                           </div>
-                          <ExternalLink className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
                         </div>
-                      </a>
-                    ) : null}
+                      </Link>
+                      <div className="flex items-center gap-2 ml-3">
+                        <a
+                          href={problem.leetcodeUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Open ${problem.title} on LeetCode`}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-secondary transition-colors"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                        <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               );

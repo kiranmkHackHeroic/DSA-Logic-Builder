@@ -37,11 +37,15 @@ const ProblemSolving = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const problemId = id || "1";
+  const isCompanyRoute = problemId.startsWith("company-");
+  const companyRouteId = isCompanyRoute ? Number(problemId.replace("company-", "")) : null;
   const numericProblemId = Number(problemId);
   const { progress, isLoading, updateProgressAsync } = useProblemProgress(problemId);
 
-  const problem = getProblemById(numericProblemId);
-  const companyProblem = COMPANY_PROBLEMS.find((item) => item.localProblemId === numericProblemId);
+  const problem = Number.isFinite(numericProblemId) ? getProblemById(numericProblemId) : undefined;
+  const companyProblem = isCompanyRoute
+    ? COMPANY_PROBLEMS.find((item) => item.id === companyRouteId)
+    : COMPANY_PROBLEMS.find((item) => item.localProblemId === numericProblemId);
 
   const problemData = {
     title: problem?.title || companyProblem?.title || `Problem #${problemId}`,

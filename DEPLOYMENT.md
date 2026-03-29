@@ -3,7 +3,7 @@
 ## Quick Overview
 
 Your app uses:
-- **Frontend**: React + Vite (deployed on Vercel/Netlify)
+- **Frontend**: React + Vite (deployed on Vercel)
 - **Backend**: Supabase (handles auth, database, API)
 
 ---

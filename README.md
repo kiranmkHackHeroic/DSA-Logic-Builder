@@ -50,22 +50,26 @@ Run migrations in Supabase SQL Editor in this order:
 
 ## Deployment
 
-### Netlify
+### Vercel (Recommended)
 
-This repo includes `netlify.toml` with:
+This repo includes `vercel.json` with:
 
-- Build command: `npm run build`
-- Publish directory: `dist`
-- SPA redirect support for React Router
+- SPA rewrites for React Router routes
+- Security headers
+- Cache headers for static assets
 
-Set these environment variables in Netlify Site Settings:
+Steps:
 
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_PUBLISHABLE_KEY`
+1. Import this repository into Vercel.
+2. Build command: `npm run build`
+3. Output directory: `dist`
+4. Add environment variables:
+	- `VITE_SUPABASE_URL`
+	- `VITE_SUPABASE_PUBLISHABLE_KEY`
 
 ### Supabase Auth URLs
 
 After deploying, update Supabase Authentication URL settings:
 
-- Site URL: `https://<your-netlify-domain>.netlify.app`
-- Redirect URLs: `https://<your-netlify-domain>.netlify.app/**`
+- Site URL: `https://<your-vercel-domain>.vercel.app`
+- Redirect URLs: `https://<your-vercel-domain>.vercel.app/**`
