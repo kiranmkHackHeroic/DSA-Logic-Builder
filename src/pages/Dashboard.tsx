@@ -1,6 +1,6 @@
-import { useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,6 @@ import {
 } from "lucide-react";
 
 const Dashboard = () => {
-  const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { profile, isLoading: profileLoading } = useProfile();
   const { streak, isLoading: streakLoading } = useUserStreak();
@@ -33,14 +32,8 @@ const Dashboard = () => {
   // SEO
   useSEO(pageSEO.dashboard);
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/auth");
-    }
-  }, [user, authLoading, navigate]);
-
-  // Show skeleton while loading
-  if (authLoading || profileLoading || streakLoading || progressLoading) {
+  // Only block on auth loading. Data sections render with fallbacks to avoid indefinite buffering.
+  if (authLoading) {
     return (
       <>
         <Navbar />
@@ -50,8 +43,26 @@ const Dashboard = () => {
   }
 
   if (!user) {
-    return null;
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="pt-24 pb-12 px-4">
+          <div className="container mx-auto max-w-xl text-center">
+            <h1 className="text-2xl font-bold mb-2">Session Required</h1>
+            <p className="text-muted-foreground mb-6">
+              Please sign in again to view your dashboard.
+            </p>
+            <Link to="/auth">
+              <Button variant="hero">Go to Login</Button>
+            </Link>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
   }
+
+  const isDataLoading = profileLoading || streakLoading || progressLoading;
 
   const completedProblems = allProgress?.filter(p => p.status === "completed") || [];
   const inProgressProblems = allProgress?.filter(p => p.status === "in_progress") || [];
@@ -85,6 +96,9 @@ const Dashboard = () => {
               Welcome back, <span className="gradient-text">{profile?.display_name || user.email?.split("@")[0]}</span>
             </h1>
             <p className="text-muted-foreground">Continue building your problem-solving skills</p>
+            {isDataLoading && (
+              <p className="text-xs text-muted-foreground mt-1">Syncing your latest progress...</p>
+            )}
           </div>
 
           {/* Stats Grid */}
