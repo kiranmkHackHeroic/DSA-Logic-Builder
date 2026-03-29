@@ -11,6 +11,8 @@ import { useUserStreak } from "@/hooks/useUserStreak";
 import { useAllProgress } from "@/hooks/useProblemProgress";
 import { useSEO, pageSEO } from "@/hooks/useSEO";
 import { DashboardSkeleton } from "@/components/ui/skeleton-loaders";
+import { getProblemById } from "@/data/problems";
+import { COMPANY_PROBLEMS } from "@/data/companyProblems";
 import { 
   Brain, 
   Target, 
@@ -22,6 +24,55 @@ import {
   ArrowRight,
   Flame,
 } from "lucide-react";
+
+const toDate = (value?: string | null) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const resolveProblemMeta = (problemId: string) => {
+  if (problemId.startsWith("company-")) {
+    const companyId = Number(problemId.replace("company-", ""));
+    const companyProblem = COMPANY_PROBLEMS.find((item) => item.id === companyId);
+    return {
+      routeId: problemId,
+      title: companyProblem?.title || `Problem ${problemId}`,
+      difficulty: companyProblem?.difficulty || "medium",
+      pattern: companyProblem?.concept || "General",
+    };
+  }
+
+  const numericId = Number(problemId);
+  if (Number.isFinite(numericId)) {
+    const internalProblem = getProblemById(numericId);
+    if (internalProblem) {
+      return {
+        routeId: String(numericId),
+        title: internalProblem.title,
+        difficulty: internalProblem.difficulty,
+        pattern: internalProblem.pattern,
+      };
+    }
+
+    const companyProblem = COMPANY_PROBLEMS.find((item) => item.localProblemId === numericId);
+    if (companyProblem) {
+      return {
+        routeId: String(numericId),
+        title: companyProblem.title,
+        difficulty: companyProblem.difficulty,
+        pattern: companyProblem.concept,
+      };
+    }
+  }
+
+  return {
+    routeId: problemId,
+    title: `Problem ${problemId}`,
+    difficulty: "medium",
+    pattern: "General",
+  };
+};
 
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
@@ -71,18 +122,50 @@ const Dashboard = () => {
     ? Math.round(completedProblems.reduce((sum, p) => sum + (p.logic_score || 70), 0) / completedProblems.length)
     : 0;
 
-  const recentProblems = [
-    { id: "1", title: "Two Sum", difficulty: "easy", status: allProgress?.find(p => p.problem_id === "1")?.status || "pending", pattern: "Hash Map" },
-    { id: "2", title: "Container With Most Water", difficulty: "medium", status: allProgress?.find(p => p.problem_id === "2")?.status || "pending", pattern: "Two Pointers" },
-    { id: "3", title: "Longest Substring", difficulty: "medium", status: allProgress?.find(p => p.problem_id === "3")?.status || "pending", pattern: "Sliding Window" },
-    { id: "4", title: "Binary Search", difficulty: "easy", status: allProgress?.find(p => p.problem_id === "4")?.status || "pending", pattern: "Binary Search" },
-  ];
+  const recentProblems = (allProgress || [])
+    .slice(0, 6)
+    .map((item) => {
+      const meta = resolveProblemMeta(item.problem_id);
+      return {
+        id: meta.routeId,
+        title: meta.title,
+        difficulty: meta.difficulty,
+        status: item.status,
+        pattern: meta.pattern,
+      };
+    });
 
-  const suggestedPatterns = [
-    { name: "Sliding Window", progress: 40, color: "primary" },
-    { name: "Binary Search", progress: 25, color: "accent" },
-    { name: "Dynamic Programming", progress: 10, color: "warning" },
-  ];
+  const patternAttempts = (allProgress || []).reduce<Record<string, number>>((acc, item) => {
+    const pattern = resolveProblemMeta(item.problem_id).pattern;
+    acc[pattern] = (acc[pattern] || 0) + 1;
+    return acc;
+  }, {});
+
+  const patternSolved = completedProblems.reduce<Record<string, number>>((acc, item) => {
+    const pattern = resolveProblemMeta(item.problem_id).pattern;
+    acc[pattern] = (acc[pattern] || 0) + 1;
+    return acc;
+  }, {});
+
+  const patternColors: Array<"primary" | "accent" | "warning"> = ["primary", "accent", "warning"];
+  const suggestedPatterns = Object.entries(patternAttempts)
+    .map(([name, attempts], index) => {
+      const solved = patternSolved[name] || 0;
+      return {
+        name,
+        progress: attempts > 0 ? Math.round((solved / attempts) * 100) : 0,
+        color: patternColors[index % patternColors.length],
+      };
+    })
+    .sort((a, b) => b.progress - a.progress)
+    .slice(0, 3);
+
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const weeklySolved = completedProblems.filter((item) => {
+    const completedDate = toDate(item.completed_at) || toDate(item.updated_at);
+    return completedDate ? completedDate >= weekAgo : false;
+  }).length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -178,35 +261,41 @@ const Dashboard = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    {recentProblems.map((problem) => (
-                      <Link key={problem.id} to={`/problems/${problem.id}`}>
-                        <div className="flex items-center justify-between p-4 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors group">
-                          <div className="flex items-center gap-4">
-                            <div className={`
-                              w-8 h-8 rounded-lg flex items-center justify-center
-                              ${problem.status === "completed" ? "bg-success/10" : problem.status === "in_progress" ? "bg-warning/10" : "bg-muted"}
-                            `}>
-                              {problem.status === "completed" ? (
-                                <CheckCircle className="h-4 w-4 text-success" />
-                              ) : problem.status === "in_progress" ? (
-                                <Clock className="h-4 w-4 text-warning" />
-                              ) : (
-                                <Target className="h-4 w-4 text-muted-foreground" />
-                              )}
+                  {recentProblems.length > 0 ? (
+                    <div className="space-y-3">
+                      {recentProblems.map((problem) => (
+                        <Link key={problem.id} to={`/problems/${problem.id}`}>
+                          <div className="flex items-center justify-between p-4 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors group">
+                            <div className="flex items-center gap-4">
+                              <div className={`
+                                w-8 h-8 rounded-lg flex items-center justify-center
+                                ${problem.status === "completed" ? "bg-success/10" : problem.status === "in_progress" ? "bg-warning/10" : "bg-muted"}
+                              `}>
+                                {problem.status === "completed" ? (
+                                  <CheckCircle className="h-4 w-4 text-success" />
+                                ) : problem.status === "in_progress" ? (
+                                  <Clock className="h-4 w-4 text-warning" />
+                                ) : (
+                                  <Target className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-medium group-hover:text-primary transition-colors">{problem.title}</p>
+                                <p className="text-xs text-muted-foreground">{problem.pattern}</p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-medium group-hover:text-primary transition-colors">{problem.title}</p>
-                              <p className="text-xs text-muted-foreground">{problem.pattern}</p>
-                            </div>
+                            <Badge variant={problem.difficulty as "easy" | "medium" | "hard"}>
+                              {problem.difficulty}
+                            </Badge>
                           </div>
-                          <Badge variant={problem.difficulty as "easy" | "medium" | "hard"}>
-                            {problem.difficulty}
-                          </Badge>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No progress yet. Start your first problem to build your learning feed.
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -259,18 +348,24 @@ const Dashboard = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {suggestedPatterns.map((pattern) => (
-                    <div key={pattern.name}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>{pattern.name}</span>
-                        <span className="text-muted-foreground">{pattern.progress}%</span>
+                  {suggestedPatterns.length > 0 ? (
+                    suggestedPatterns.map((pattern) => (
+                      <div key={pattern.name}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span>{pattern.name}</span>
+                          <span className="text-muted-foreground">{pattern.progress}%</span>
+                        </div>
+                        <Progress 
+                          value={pattern.progress} 
+                          variant={pattern.color as "primary" | "accent" | "warning"}
+                        />
                       </div>
-                      <Progress 
-                        value={pattern.progress} 
-                        variant={pattern.color as "primary" | "accent" | "warning"}
-                      />
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Pattern insights will appear after your first solved problem.
+                    </p>
+                  )}
                   <Link to="/patterns">
                     <Button variant="outline" className="w-full mt-4">
                       View All Patterns
@@ -289,14 +384,14 @@ const Dashboard = () => {
                   <div className="mb-2">
                     <div className="flex justify-between text-sm mb-1">
                       <span>5 problems this week</span>
-                      <span className="text-primary font-medium">{Math.min(streak?.total_problems_solved || 0, 5)}/5</span>
+                      <span className="text-primary font-medium">{Math.min(weeklySolved, 5)}/5</span>
                     </div>
-                    <Progress value={Math.min((streak?.total_problems_solved || 0) / 5 * 100, 100)} variant="accent" />
+                      <Progress value={Math.min((weeklySolved / 5) * 100, 100)} variant="accent" />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {(streak?.total_problems_solved || 0) >= 5 
+                      {weeklySolved >= 5 
                       ? "Goal achieved! 🎉" 
-                      : `${5 - (streak?.total_problems_solved || 0)} more to reach your goal!`}
+                        : `${5 - weeklySolved} more to reach your goal!`}
                   </p>
                 </CardContent>
               </Card>
