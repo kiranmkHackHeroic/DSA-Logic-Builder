@@ -2,9 +2,10 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserStreak } from "@/hooks/useUserStreak";
 import { useAllProgress } from "@/hooks/useProblemProgress";
@@ -20,7 +21,11 @@ import {
   AlertTriangle,
   CheckCircle,
   Zap,
-  Loader2
+  Loader2,
+  ArrowRight,
+  CalendarDays,
+  Trophy,
+  Lightbulb
 } from "lucide-react";
 
 const Analytics = () => {
@@ -38,7 +43,10 @@ const Analytics = () => {
   if (authLoading || streakLoading || progressLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="text-center space-y-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <p className="text-sm text-muted-foreground">Loading your analytics...</p>
+        </div>
       </div>
     );
   }
@@ -49,6 +57,8 @@ const Analytics = () => {
 
   const completedProblems = allProgress?.filter(p => p.status === "completed") || [];
   const inProgressProblems = allProgress?.filter(p => p.status === "in_progress") || [];
+  const attemptedCount = allProgress?.length || 0;
+  const solvedCount = completedProblems.length;
   
   const logicScore = completedProblems.length > 0
     ? Math.round(completedProblems.reduce((sum, p) => sum + (p.logic_score || 70), 0) / completedProblems.length)
@@ -133,35 +143,121 @@ const Analytics = () => {
 
   const totalTime = avgThinkingTime + avgCodingTime;
   const thinkingPercentage = totalTime > 0 ? Math.round((avgThinkingTime / totalTime) * 100) : 50;
+  const completionRate = attemptedCount > 0 ? Math.round((solvedCount / attemptedCount) * 100) : 0;
+  const totalMinutesTracked = (allProgress || []).reduce(
+    (sum, item) => sum + (item.time_spent_thinking || 0) + (item.time_spent_coding || 0),
+    0
+  );
+  const totalHoursTracked = (totalMinutesTracked / 60).toFixed(1);
+  const hasAnyProgress = attemptedCount > 0;
+  const strongestPattern = patternData.length > 0 ? [...patternData].sort((a, b) => b.mastery - a.mastery)[0] : null;
+  const weakestPattern = weakAreas[0] || null;
+  const lastActivityLabel = allProgress?.[0]?.updated_at
+    ? new Date(allProgress[0].updated_at).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "No activity yet";
+
+  const reveal = (delayMs: number) => ({
+    className: "animate-slide-up opacity-0",
+    style: { animationDelay: `${delayMs}ms` } as const,
+  });
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
       
-      <main className="pt-24 pb-12 px-4">
+      <main className="pt-24 pb-12 px-3 sm:px-4">
         <div className="container mx-auto">
           {/* Header */}
-          <div className="mb-8">
-            <Badge variant="primary" className="mb-4">Progress Analytics</Badge>
-            <h1 className="text-3xl font-bold mb-2">Your Learning Journey</h1>
-            <p className="text-muted-foreground">
-              Track your progress, identify weak areas, and optimize your learning
-            </p>
+          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <Badge variant="primary" className="mb-4">Progress Analytics</Badge>
+              <h1 className="text-2xl sm:text-3xl font-bold mb-2">Your Learning Journey</h1>
+              <p className="text-muted-foreground">
+                Clear insights from your real practice data with next best actions.
+              </p>
+            </div>
+            <div className="inline-flex w-fit flex-wrap items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs sm:text-sm text-muted-foreground">
+              <CalendarDays className="h-4 w-4 text-primary" />
+              Last activity: <span className="font-medium text-foreground">{lastActivityLabel}</span>
+            </div>
           </div>
 
+          <Card variant="gradient" className={`mb-8 ${reveal(40).className}`} style={reveal(40).style}>
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
+                <Trophy className="h-6 w-6 text-warning" />
+                Performance Snapshot
+              </CardTitle>
+              <CardDescription>
+                A concise view of your consistency, speed, and problem-solving quality.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-lg border border-border bg-card/80 p-4">
+                  <p className="text-sm text-muted-foreground mb-1">Completion Rate</p>
+                  <p className="text-2xl font-bold">{completionRate}%</p>
+                  <p className="text-xs text-muted-foreground mt-1">{solvedCount} solved out of {attemptedCount} attempted</p>
+                </div>
+                <div className="rounded-lg border border-border bg-card/80 p-4">
+                  <p className="text-sm text-muted-foreground mb-1">Tracked Practice Time</p>
+                  <p className="text-2xl font-bold">{totalHoursTracked}h</p>
+                  <p className="text-xs text-muted-foreground mt-1">Across thinking + coding sessions</p>
+                </div>
+                <div className="rounded-lg border border-border bg-card/80 p-4">
+                  <p className="text-sm text-muted-foreground mb-1">Current Focus</p>
+                  <p className="text-xl sm:text-2xl font-bold break-words">{strongestPattern?.name || "Start solving"}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {strongestPattern ? `${strongestPattern.mastery}% mastery in top pattern` : "Solve your first problem to unlock insights"}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {!hasAnyProgress && (
+            <Card
+              variant="elevated"
+              className={`mb-8 border-primary/20 bg-primary/5 ${reveal(80).className}`}
+              style={reveal(80).style}
+            >
+              <CardContent className="pt-6">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold">No progress yet</h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Start one guided problem to unlock pattern mastery, time insights, and improvement recommendations.
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                    <Button className="w-full sm:w-auto" variant="hero" onClick={() => navigate("/problems")}>Start Solving</Button>
+                    <Button className="w-full sm:w-auto" variant="outline" onClick={() => navigate("/interview")}>Try Interview Mode</Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Top Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+          <div
+            className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8 ${reveal(120).className}`}
+            style={reveal(120).style}
+          >
             <Card variant="feature">
               <CardContent className="pt-6 text-center">
                 <Target className="h-6 w-6 mx-auto mb-2 text-primary" />
-                <p className="text-2xl font-bold">{streak?.total_problems_attempted || 0}</p>
+                <p className="text-2xl font-bold">{attemptedCount}</p>
                 <p className="text-xs text-muted-foreground">Problems Attempted</p>
               </CardContent>
             </Card>
             <Card variant="feature">
               <CardContent className="pt-6 text-center">
                 <CheckCircle className="h-6 w-6 mx-auto mb-2 text-success" />
-                <p className="text-2xl font-bold">{streak?.total_problems_solved || 0}</p>
+                <p className="text-2xl font-bold">{solvedCount}</p>
                 <p className="text-xs text-muted-foreground">Problems Solved</p>
               </CardContent>
             </Card>
@@ -195,7 +291,7 @@ const Analytics = () => {
             </Card>
           </div>
 
-          <div className="grid lg:grid-cols-3 gap-6">
+          <div className={`grid lg:grid-cols-3 gap-6 ${reveal(180).className}`} style={reveal(180).style}>
             {/* Pattern Mastery */}
             <Card variant="elevated" className="lg:col-span-2">
               <CardHeader>
@@ -209,14 +305,14 @@ const Analytics = () => {
                   <div className="space-y-4">
                     {patternData.map((pattern) => (
                       <div key={pattern.name}>
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="font-medium">{pattern.name}</span>
                             <Badge variant="secondary" className="text-xs">
                               {pattern.problems} problems
                             </Badge>
                           </div>
-                          <span className="text-sm font-medium">{pattern.mastery}%</span>
+                          <span className="text-sm font-medium shrink-0">{pattern.mastery}%</span>
                         </div>
                         <Progress 
                           value={pattern.mastery} 
@@ -270,7 +366,7 @@ const Analytics = () => {
                     </div>
                   </div>
                 </div>
-                <div className="flex justify-center gap-6 text-sm">
+                <div className="flex flex-col sm:flex-row sm:justify-center gap-3 sm:gap-6 text-sm">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-primary" />
                     <span>Thinking ({avgThinkingTime}m avg)</span>
@@ -306,9 +402,12 @@ const Analytics = () => {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No weak areas yet. Complete a few problems to get personalized improvement insights.
-                  </p>
+                  <div className="rounded-lg border border-success/30 bg-success/5 p-4">
+                    <p className="text-sm font-medium text-success">No major weak areas detected yet.</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Keep solving consistently to maintain pattern coverage and reveal deeper optimization opportunities.
+                    </p>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -337,15 +436,34 @@ const Analytics = () => {
                   </div>
                   <div className="flex items-center justify-between py-3">
                     <span className="text-muted-foreground">Completion Rate</span>
-                    <Badge variant="accent">
-                      {(streak?.total_problems_attempted || 0) > 0 
-                        ? Math.round(((streak?.total_problems_solved || 0) / (streak?.total_problems_attempted || 1)) * 100)
-                        : 0}%
-                    </Badge>
+                    <Badge variant="accent">{completionRate}%</Badge>
+                  </div>
+                  <div className="pt-2 grid gap-2">
+                    <Button className="w-full" variant="hero-outline" size="sm" onClick={() => navigate("/problems")}>
+                      Continue Practice
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                    <Button className="w-full" variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
+                      <Lightbulb className="h-4 w-4" />
+                      Review Dashboard Goals
+                    </Button>
                   </div>
                 </div>
               </CardContent>
             </Card>
+
+            {weakestPattern && (
+              <Card variant="elevated" className="lg:col-span-3 border-warning/30 bg-warning/5">
+                <CardContent className="pt-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Recommended next focus</p>
+                    <p className="text-lg font-semibold">Improve {weakestPattern.area} ({weakestPattern.score}%)</p>
+                    <p className="text-sm text-muted-foreground">{weakestPattern.suggestion}</p>
+                  </div>
+                  <Button className="w-full md:w-auto" variant="warning" onClick={() => navigate("/problems")}>Practice This Pattern</Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </main>
