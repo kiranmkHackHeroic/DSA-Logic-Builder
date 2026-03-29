@@ -14,42 +14,67 @@ import CodingStep from "@/components/problem/CodingStep";
 import VisualizationStep from "@/components/problem/VisualizationStep";
 import { useProblemProgress } from "@/hooks/useProblemProgress";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArrowLeft, Clock, BookOpen } from "lucide-react";
+import { ArrowLeft, Clock, BookOpen, ExternalLink, Loader2 } from "lucide-react";
+import { getProblemById } from "@/data/problems";
+import { COMPANY_PROBLEMS } from "@/data/companyProblems";
+import { useToast } from "@/hooks/use-toast";
 
-const sampleProblem = {
-  id: 1,
-  title: "Two Sum",
-  difficulty: "easy",
-  pattern: "Hash Map",
-  description: "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target. You may assume that each input would have exactly one solution, and you may not use the same element twice.",
-  examples: [
-    {
-      input: "nums = [2,7,11,15], target = 9",
-      output: "[0, 1]",
-      explanation: "Because nums[0] + nums[1] == 9, we return [0, 1]",
-    },
-    {
-      input: "nums = [3,2,4], target = 6",
-      output: "[1, 2]",
-    },
-  ],
-  constraints: [
-    "2 <= nums.length <= 10^4",
-    "-10^9 <= nums[i] <= 10^9",
-    "-10^9 <= target <= 10^9",
-    "Only one valid answer exists",
-  ],
+const toLeetCodeSlug = (title: string) =>
+  title
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+
+const getLeetCodeUrl = (title: string, explicitUrl?: string) => {
+  if (explicitUrl) return explicitUrl;
+  return `https://leetcode.com/problems/${toLeetCodeSlug(title)}/`;
 };
 
 const ProblemSolving = () => {
   const { id } = useParams();
   const { user } = useAuth();
+  const { toast } = useToast();
   const problemId = id || "1";
-  const { progress, isLoading, updateProgress } = useProblemProgress(problemId);
+  const numericProblemId = Number(problemId);
+  const { progress, isLoading, updateProgressAsync } = useProblemProgress(problemId);
+
+  const problem = getProblemById(numericProblemId);
+  const companyProblem = COMPANY_PROBLEMS.find((item) => item.localProblemId === numericProblemId);
+
+  const problemData = {
+    title: problem?.title || companyProblem?.title || `Problem #${problemId}`,
+    difficulty: problem?.difficulty || companyProblem?.difficulty || "medium",
+    pattern: problem?.pattern || companyProblem?.concept || "General",
+    description:
+      problem?.description ||
+      `Solve ${problem?.title || companyProblem?.title || "this problem"} using the 7-step process: understand, think manually, brute force, optimize, finalize, code, and visualize.`,
+    examples:
+      problem?.examples?.length
+        ? problem.examples
+        : [
+            {
+              input: "Use the provided examples from the original problem statement.",
+              output: "Derive expected output from the logic.",
+              explanation: "If examples are missing, create small custom test cases before coding.",
+            },
+          ],
+    constraints:
+      problem?.constraints?.length
+        ? problem.constraints
+        : [
+            "Read constraints from the source problem.",
+            "Target an optimal solution based on input size.",
+            "Validate edge cases before final submission.",
+          ],
+    leetcodeUrl: getLeetCodeUrl(problem?.title || companyProblem?.title || `problem-${problemId}`, companyProblem?.leetcodeUrl),
+  };
   
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [initialized, setInitialized] = useState(false);
+  const [isAdvancingStep, setIsAdvancingStep] = useState(false);
 
   // Load saved progress from DB
   useEffect(() => {
@@ -64,8 +89,14 @@ const ProblemSolving = () => {
 
   const totalSteps = 7;
   const progressPercent = (completedSteps.length / totalSteps) * 100;
+  const maxUnlockedStep = Math.min(totalSteps, Math.max(1, ...completedSteps, currentStep) + 1);
 
-  const completeStep = useCallback((step: number) => {
+  const completeStep = useCallback(async (step: number) => {
+    if (isAdvancingStep) return;
+
+    const previousStep = currentStep;
+    const previousCompleted = completedSteps;
+
     const newCompleted = completedSteps.includes(step) 
       ? completedSteps 
       : [...completedSteps, step];
@@ -74,16 +105,29 @@ const ProblemSolving = () => {
     setCompletedSteps(newCompleted);
     setCurrentStep(newStep);
 
-    if (user) {
+    if (!user) return;
+
+    setIsAdvancingStep(true);
+    try {
       const isAllComplete = newCompleted.length === totalSteps;
-      updateProgress({
+      await updateProgressAsync({
         current_step: newStep,
         completed_steps: newCompleted,
         status: isAllComplete ? "completed" : "in_progress",
         ...(isAllComplete ? { completed_at: new Date().toISOString() } : {}),
       });
+    } catch {
+      setCurrentStep(previousStep);
+      setCompletedSteps(previousCompleted);
+      toast({
+        title: "Could not save progress",
+        description: "Step progress was not saved. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAdvancingStep(false);
     }
-  }, [completedSteps, user, updateProgress]);
+  }, [completedSteps, currentStep, isAdvancingStep, toast, totalSteps, user, updateProgressAsync]);
 
   const getStepStatus = (step: number): "completed" | "active" | "locked" => {
     if (completedSteps.includes(step)) return "completed";
@@ -101,6 +145,68 @@ const ProblemSolving = () => {
     { id: 7, title: "Visualization", status: getStepStatus(7) },
   ];
 
+  const renderCurrentStep = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <UnderstandProblemStep
+            problem={problemData}
+            onComplete={() => void completeStep(1)}
+            isActive={true}
+          />
+        );
+      case 2:
+        return (
+          <HumanThinkingStep
+            onComplete={() => void completeStep(2)}
+            isActive={true}
+            isCompleted={completedSteps.includes(2)}
+          />
+        );
+      case 3:
+        return (
+          <BruteForceStep
+            constraints={problemData.constraints}
+            onComplete={() => void completeStep(3)}
+            isActive={true}
+            isCompleted={completedSteps.includes(3)}
+          />
+        );
+      case 4:
+        return (
+          <OptimizationStep
+            onComplete={() => void completeStep(4)}
+            isActive={true}
+            isCompleted={completedSteps.includes(4)}
+          />
+        );
+      case 5:
+        return (
+          <FinalApproachStep
+            onComplete={() => void completeStep(5)}
+            isActive={true}
+            isCompleted={completedSteps.includes(5)}
+          />
+        );
+      case 6:
+        return (
+          <CodingStep
+            isActive={true}
+            isCompleted={completedSteps.includes(6)}
+            onComplete={() => void completeStep(6)}
+          />
+        );
+      default:
+        return (
+          <VisualizationStep
+            isActive={true}
+            isCompleted={completedSteps.includes(7)}
+            onComplete={() => void completeStep(7)}
+          />
+        );
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -117,15 +223,15 @@ const ProblemSolving = () => {
               </Link>
               <div>
                 <div className="flex items-center gap-3 mb-1">
-                  <h1 className="text-2xl font-bold">{sampleProblem.title}</h1>
-                  <Badge variant={sampleProblem.difficulty as "easy" | "medium" | "hard"}>
-                    {sampleProblem.difficulty}
+                  <h1 className="text-2xl font-bold">{problemData.title}</h1>
+                  <Badge variant={problemData.difficulty as "easy" | "medium" | "hard"}>
+                    {problemData.difficulty}
                   </Badge>
                 </div>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <BookOpen className="h-4 w-4" />
-                    {sampleProblem.pattern}
+                    {problemData.pattern}
                   </span>
                   <span className="flex items-center gap-1">
                     <Clock className="h-4 w-4" />
@@ -136,6 +242,12 @@ const ProblemSolving = () => {
             </div>
 
             <div className="flex items-center gap-4">
+              <a href={problemData.leetcodeUrl} target="_blank" rel="noreferrer">
+                <Button variant="outline" size="sm">
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  LeetCode
+                </Button>
+              </a>
               <div className="text-sm text-muted-foreground">
                 Progress: {completedSteps.length}/{totalSteps} steps
               </div>
@@ -144,6 +256,32 @@ const ProblemSolving = () => {
           </div>
 
           {/* Main Content */}
+          <div className="lg:hidden mb-4 bg-card/50 border border-border rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Step {currentStep} of {totalSteps}</p>
+              <Badge variant="step-active">{steps[currentStep - 1]?.title}</Badge>
+            </div>
+            <Progress value={(currentStep / totalSteps) * 100} variant="primary" />
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isAdvancingStep || currentStep <= 1}
+                onClick={() => setCurrentStep((prev) => Math.max(1, prev - 1))}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isAdvancingStep || currentStep >= maxUnlockedStep}
+                onClick={() => setCurrentStep((prev) => Math.min(maxUnlockedStep, prev + 1))}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+
           <div className="grid lg:grid-cols-[240px_1fr] gap-6">
             {/* Step Sidebar */}
             <div className="hidden lg:block">
@@ -155,7 +293,7 @@ const ProblemSolving = () => {
                   steps={steps}
                   currentStep={currentStep}
                   onStepClick={(step) => {
-                    if (completedSteps.includes(step) || step === currentStep) {
+                    if (!isAdvancingStep && (completedSteps.includes(step) || step === currentStep)) {
                       setCurrentStep(step);
                     }
                   }}
@@ -165,46 +303,13 @@ const ProblemSolving = () => {
 
             {/* Steps Content */}
             <div className="space-y-6">
-              <UnderstandProblemStep
-                problem={sampleProblem}
-                onComplete={() => completeStep(1)}
-                isActive={currentStep === 1}
-              />
-              
-              <HumanThinkingStep
-                onComplete={() => completeStep(2)}
-                isActive={currentStep === 2}
-                isCompleted={completedSteps.includes(2)}
-              />
-              
-              <BruteForceStep
-                constraints={sampleProblem.constraints}
-                onComplete={() => completeStep(3)}
-                isActive={currentStep === 3}
-                isCompleted={completedSteps.includes(3)}
-              />
-              
-              <OptimizationStep
-                onComplete={() => completeStep(4)}
-                isActive={currentStep === 4}
-                isCompleted={completedSteps.includes(4)}
-              />
-              
-              <FinalApproachStep
-                onComplete={() => completeStep(5)}
-                isActive={currentStep === 5}
-                isCompleted={completedSteps.includes(5)}
-              />
-              
-              <CodingStep
-                isActive={currentStep === 6}
-                isCompleted={completedSteps.includes(6)}
-                onComplete={() => completeStep(6)}
-              />
-              
-              <VisualizationStep
-                isActive={currentStep >= 7 || completedSteps.includes(6)}
-              />
+              {isAdvancingStep && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving step progress...
+                </div>
+              )}
+              {renderCurrentStep()}
             </div>
           </div>
         </div>

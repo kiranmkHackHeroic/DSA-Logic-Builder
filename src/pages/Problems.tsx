@@ -20,6 +20,16 @@ import {
   ExternalLink,
 } from "lucide-react";
 
+const toLeetCodeSlug = (title: string) =>
+  title
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+
+const buildLeetCodeUrl = (title: string) => `https://leetcode.com/problems/${toLeetCodeSlug(title)}/`;
+
 const problems = COMPANY_PROBLEMS.filter((problem) => problem.striverSheet).map((problem) => ({
   id: problem.id,
   title: problem.title,
@@ -27,7 +37,7 @@ const problems = COMPANY_PROBLEMS.filter((problem) => problem.striverSheet).map(
   pattern: problem.concept,
   companies: problem.companies,
   localProblemId: problem.localProblemId,
-  leetcodeUrl: problem.leetcodeUrl,
+  leetcodeUrl: problem.leetcodeUrl || buildLeetCodeUrl(problem.title),
 }));
 
 const formatCompanyName = (company: string) => company.charAt(0).toUpperCase() + company.slice(1);
@@ -186,8 +196,8 @@ const Problems = () => {
                 <Card key={problem.id} variant="interactive" className="group">
                   <CardContent className="py-4">
                     {internalPath ? (
-                      <Link to={internalPath}>
-                        <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between">
+                        <Link to={internalPath} className="flex-1 min-w-0">
                           <div className="flex items-center gap-4">
                             <div
                               className={`
@@ -231,9 +241,20 @@ const Problems = () => {
                               </div>
                             </div>
                           </div>
+                        </Link>
+                        <div className="flex items-center gap-2 ml-3">
+                          <a
+                            href={problem.leetcodeUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`Open ${problem.title} on LeetCode`}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-secondary transition-colors"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
                           <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
                         </div>
-                      </Link>
+                      </div>
                     ) : externalPath ? (
                       <a href={externalPath} target="_blank" rel="noopener noreferrer" className="block">
                         <div className="flex items-center justify-between">

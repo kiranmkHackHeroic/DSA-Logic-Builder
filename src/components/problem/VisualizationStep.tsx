@@ -6,9 +6,11 @@ import { useState, useEffect } from "react";
 
 interface VisualizationStepProps {
   isActive: boolean;
+  isCompleted: boolean;
+  onComplete: () => void;
 }
 
-const VisualizationStep = ({ isActive }: VisualizationStepProps) => {
+const VisualizationStep = ({ isActive, isCompleted, onComplete }: VisualizationStepProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   
@@ -51,7 +53,7 @@ const VisualizationStep = ({ isActive }: VisualizationStepProps) => {
             </span>
             Visual Simulation
           </CardTitle>
-          <Badge variant="accent">Interactive</Badge>
+          <Badge variant={isCompleted ? "success" : "accent"}>{isCompleted ? "Completed" : "Interactive"}</Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -146,6 +148,12 @@ const VisualizationStep = ({ isActive }: VisualizationStepProps) => {
                 />
               ))}
             </div>
+
+            {!isCompleted && (
+              <Button variant="success" className="w-full" onClick={onComplete}>
+                Mark Visualization Complete
+              </Button>
+            )}
           </>
         )}
 

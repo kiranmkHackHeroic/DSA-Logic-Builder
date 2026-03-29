@@ -70,13 +70,25 @@ const Footer = () => {
             <p className="text-xs mt-1">Built by Kiran M K.</p>
           </div>
           <div className="flex items-center gap-4">
-            <a href="#" aria-label="GitHub" className="inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-secondary transition-colors">
+            <a
+              href="https://github.com/kiranmkHackHeroic"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="GitHub"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-secondary transition-colors"
+            >
               <Github className="h-5 w-5" />
             </a>
             <a href="#" aria-label="Twitter" className="inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-secondary transition-colors">
               <Twitter className="h-5 w-5" />
             </a>
-            <a href="#" aria-label="LinkedIn" className="inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-secondary transition-colors">
+            <a
+              href="https://www.linkedin.com/in/kiran-m-k-43a5aa299/"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="LinkedIn"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-secondary transition-colors"
+            >
               <Linkedin className="h-5 w-5" />
             </a>
           </div>

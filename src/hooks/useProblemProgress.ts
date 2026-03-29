@@ -88,6 +88,7 @@ export const useProblemProgress = (problemId: string) => {
     progress,
     isLoading,
     updateProgress: upsertProgress.mutate,
+    updateProgressAsync: upsertProgress.mutateAsync,
     isSaving: upsertProgress.isPending,
   };
 };

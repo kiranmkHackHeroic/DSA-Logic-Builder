@@ -23,8 +23,10 @@ export const ProtectedRoute = ({
   const { isAdmin, isLoading: roleLoading } = useUserRole();
   const location = useLocation();
 
+  const shouldWaitForRole = requireAdmin;
+
   // Show loading state while checking authentication
-  if (loading || roleLoading) {
+  if (loading || (shouldWaitForRole && roleLoading)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
