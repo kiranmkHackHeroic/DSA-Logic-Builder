@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -24,39 +23,68 @@ import {
   TrendingUp,
   ChevronLeft,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
+import { useAllProgress } from "@/hooks/useProblemProgress";
+import { useAuth } from "@/contexts/AuthContext";
+import { useUserStreak } from "@/hooks/useUserStreak";
+import { getProblemById } from "@/data/problems";
+import { COMPANY_PROBLEMS } from "@/data/companyProblems";
 
-// Generate activity data for the last year
-const generateActivityData = () => {
-  const data: Record<string, { count: number; problems: string[] }> = {};
-  const today = new Date();
-  
-  for (let i = 365; i >= 0; i--) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split("T")[0];
-    
-    // Random activity for demo - in real app this would come from the database
-    const random = Math.random();
-    let count = 0;
-    const problems: string[] = [];
-    
-    if (random > 0.3) {
-      count = Math.floor(Math.random() * 8) + 1;
-      for (let j = 0; j < count; j++) {
-        problems.push(["Two Sum", "Container With Most Water", "Longest Substring", "Binary Search", "Valid Parentheses"][Math.floor(Math.random() * 5)]);
-      }
-    }
-    
-    data[dateStr] = { count, problems };
+const toDateKey = (value?: string | null) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().split("T")[0];
+};
+
+const resolveProblemTitle = (problemId: string) => {
+  if (problemId.startsWith("company-")) {
+    const companyId = Number(problemId.replace("company-", ""));
+    const companyProblem = COMPANY_PROBLEMS.find((item) => item.id === companyId);
+    return companyProblem?.title || `Problem ${problemId}`;
   }
-  
-  return data;
+
+  const numericId = Number(problemId);
+  if (Number.isFinite(numericId)) {
+    const internalProblem = getProblemById(numericId);
+    if (internalProblem?.title) return internalProblem.title;
+
+    const companyProblem = COMPANY_PROBLEMS.find((item) => item.localProblemId === numericId);
+    if (companyProblem?.title) return companyProblem.title;
+  }
+
+  return `Problem ${problemId}`;
 };
 
 const ProgressHeatmap = () => {
+  const { user, loading: authLoading } = useAuth();
+  const { data: allProgress, isLoading: progressLoading } = useAllProgress();
+  const { streak, isLoading: streakLoading } = useUserStreak();
   const [year, setYear] = useState(new Date().getFullYear());
-  const [activityData] = useState(generateActivityData);
+
+  const activityData = useMemo(() => {
+    const data: Record<string, { count: number; problems: string[] }> = {};
+    if (!allProgress) return data;
+
+    allProgress.forEach((item) => {
+      const dateKey =
+        toDateKey(item.completed_at) ||
+        toDateKey(item.updated_at) ||
+        toDateKey(item.started_at);
+
+      if (!dateKey) return;
+
+      if (!data[dateKey]) {
+        data[dateKey] = { count: 0, problems: [] };
+      }
+
+      data[dateKey].count += 1;
+      data[dateKey].problems.push(resolveProblemTitle(item.problem_id));
+    });
+
+    return data;
+  }, [allProgress]);
   
   const months = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -105,41 +133,31 @@ const ProgressHeatmap = () => {
   const stats = useMemo(() => {
     let totalProblems = 0;
     let activeDays = 0;
-    let currentStreak = 0;
-    let longestStreak = 0;
-    let tempStreak = 0;
-    
-    const today = new Date();
-    const sortedDates = Object.keys(activityData).sort().reverse();
-    
-    for (const dateStr of sortedDates) {
-      const activity = activityData[dateStr];
-      if (activity.count > 0) {
-        totalProblems += activity.count;
-        activeDays++;
-        tempStreak++;
-        longestStreak = Math.max(longestStreak, tempStreak);
-      } else {
-        tempStreak = 0;
-      }
-    }
-    
-    // Calculate current streak from today
-    const todayStr = today.toISOString().split("T")[0];
-    for (let i = 0; i < 365; i++) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split("T")[0];
-      
-      if (activityData[dateStr]?.count > 0) {
-        currentStreak++;
-      } else if (i > 0) {
-        break;
-      }
-    }
-    
-    return { totalProblems, activeDays, currentStreak, longestStreak };
-  }, [activityData]);
+
+    Object.entries(activityData).forEach(([dateStr, activity]) => {
+      const activityYear = new Date(dateStr).getFullYear();
+      if (activityYear !== year) return;
+      if (activity.count <= 0) return;
+
+      totalProblems += activity.count;
+      activeDays += 1;
+    });
+
+    return {
+      totalProblems,
+      activeDays,
+      currentStreak: streak?.current_streak || 0,
+      longestStreak: streak?.longest_streak || 0,
+    };
+  }, [activityData, streak?.current_streak, streak?.longest_streak, year]);
+
+  if (authLoading || progressLoading || streakLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const getActivityLevel = (count: number): number => {
     if (count === 0) return 0;
@@ -234,7 +252,7 @@ const ProgressHeatmap = () => {
                   </div>
                   <div>
                     <p className="text-2xl font-bold">{stats.totalProblems}</p>
-                    <p className="text-xs text-muted-foreground">Problems Solved</p>
+                    <p className="text-xs text-muted-foreground">Problems Solved ({year})</p>
                   </div>
                 </div>
               </CardContent>
@@ -247,7 +265,7 @@ const ProgressHeatmap = () => {
                   </div>
                   <div>
                     <p className="text-2xl font-bold">{stats.activeDays}</p>
-                    <p className="text-xs text-muted-foreground">Active Days</p>
+                    <p className="text-xs text-muted-foreground">Active Days ({year})</p>
                   </div>
                 </div>
               </CardContent>
@@ -370,6 +388,12 @@ const ProgressHeatmap = () => {
                 ))}
                 <span>More</span>
               </div>
+
+              {!user && (
+                <p className="text-sm text-muted-foreground mt-4">
+                  Sign in to view your personal heatmap activity.
+                </p>
+              )}
             </CardContent>
           </Card>
 
