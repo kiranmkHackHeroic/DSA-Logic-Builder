@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { 
@@ -21,6 +22,9 @@ import {
 } from "lucide-react";
 
 const Index = () => {
+  const { user } = useAuth();
+  const startLearningPath = user ? "/problems/1" : "/auth?redirect=/problems/1";
+
   const features = [
     {
       icon: Brain,
@@ -99,7 +103,7 @@ const Index = () => {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: "0.3s" }}>
-            <Link to="/problems/1">
+            <Link to={startLearningPath}>
               <Button variant="hero" size="xl">
                 Start Learning
                 <ArrowRight className="h-5 w-5" />
@@ -309,7 +313,7 @@ const Index = () => {
             Stop memorizing solutions. Start building real problem-solving skills 
             that will last beyond any interview.
           </p>
-          <Link to="/problems/1">
+          <Link to={startLearningPath}>
             <Button variant="hero" size="xl">
               Start Your First Problem
               <ArrowRight className="h-5 w-5" />
