@@ -19,6 +19,37 @@ import { getProblemById } from "@/data/problems";
 import { COMPANY_PROBLEMS } from "@/data/companyProblems";
 import { useToast } from "@/hooks/use-toast";
 
+type LocalStepProgress = {
+  current_step: number;
+  completed_steps: number[];
+};
+
+const getLocalProgressKey = (problemId: string) => `problem-solving-progress:${problemId}`;
+
+const readLocalProgress = (problemId: string): LocalStepProgress | null => {
+  try {
+    const raw = localStorage.getItem(getLocalProgressKey(problemId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<LocalStepProgress>;
+    return {
+      current_step: Math.max(1, Number(parsed.current_step) || 1),
+      completed_steps: Array.isArray(parsed.completed_steps)
+        ? parsed.completed_steps.filter((step): step is number => Number.isInteger(step))
+        : [],
+    };
+  } catch {
+    return null;
+  }
+};
+
+const writeLocalProgress = (problemId: string, progress: LocalStepProgress) => {
+  try {
+    localStorage.setItem(getLocalProgressKey(problemId), JSON.stringify(progress));
+  } catch {
+    // Ignore localStorage failures; DB save still handles persistence for signed-in users.
+  }
+};
+
 const toLeetCodeSlug = (title: string) =>
   title
     .toLowerCase()
@@ -34,7 +65,7 @@ const getLeetCodeUrl = (title: string, explicitUrl?: string) => {
 
 const ProblemSolving = () => {
   const { id } = useParams();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const problemId = id || "1";
   const isCompanyRoute = problemId.startsWith("company-");
@@ -80,16 +111,47 @@ const ProblemSolving = () => {
   const [initialized, setInitialized] = useState(false);
   const [isAdvancingStep, setIsAdvancingStep] = useState(false);
 
-  // Load saved progress from DB
   useEffect(() => {
-    if (progress && !initialized) {
+    setCurrentStep(1);
+    setCompletedSteps([]);
+    setInitialized(false);
+    setIsAdvancingStep(false);
+  }, [problemId]);
+
+  // Load saved progress after auth state settles to avoid early initialization with stale/null user.
+  useEffect(() => {
+    if (initialized || authLoading) return;
+
+    if (progress) {
       setCurrentStep(progress.current_step || 1);
       setCompletedSteps(progress.completed_steps || []);
+      writeLocalProgress(problemId, {
+        current_step: progress.current_step || 1,
+        completed_steps: progress.completed_steps || [],
+      });
       setInitialized(true);
-    } else if (!isLoading && !progress && !initialized) {
+      return;
+    }
+
+    if (!isLoading && !user) {
+      const localProgress = readLocalProgress(problemId);
+      if (localProgress) {
+        setCurrentStep(localProgress.current_step);
+        setCompletedSteps(localProgress.completed_steps);
+      }
+      setInitialized(true);
+      return;
+    }
+
+    if (!isLoading && user && !progress) {
+      const localProgress = readLocalProgress(problemId);
+      if (localProgress) {
+        setCurrentStep(localProgress.current_step);
+        setCompletedSteps(localProgress.completed_steps);
+      }
       setInitialized(true);
     }
-  }, [progress, isLoading, initialized]);
+  }, [authLoading, initialized, isLoading, problemId, progress, user]);
 
   const totalSteps = 7;
   const progressPercent = (completedSteps.length / totalSteps) * 100;
@@ -108,6 +170,10 @@ const ProblemSolving = () => {
     
     setCompletedSteps(newCompleted);
     setCurrentStep(newStep);
+    writeLocalProgress(problemId, {
+      current_step: newStep,
+      completed_steps: newCompleted,
+    });
 
     if (!user) return;
 
@@ -123,6 +189,10 @@ const ProblemSolving = () => {
     } catch {
       setCurrentStep(previousStep);
       setCompletedSteps(previousCompleted);
+      writeLocalProgress(problemId, {
+        current_step: previousStep,
+        completed_steps: previousCompleted,
+      });
       toast({
         title: "Could not save progress",
         description: "Step progress was not saved. Please try again.",
@@ -131,7 +201,7 @@ const ProblemSolving = () => {
     } finally {
       setIsAdvancingStep(false);
     }
-  }, [completedSteps, currentStep, isAdvancingStep, toast, totalSteps, user, updateProgressAsync]);
+  }, [completedSteps, currentStep, isAdvancingStep, problemId, toast, totalSteps, user, updateProgressAsync]);
 
   const getStepStatus = (step: number): "completed" | "active" | "locked" => {
     if (completedSteps.includes(step)) return "completed";
@@ -198,6 +268,8 @@ const ProblemSolving = () => {
             isActive={true}
             isCompleted={completedSteps.includes(6)}
             onComplete={() => void completeStep(6)}
+            leetcodeUrl={problemData.leetcodeUrl}
+            autoOpenLeetCode={true}
           />
         );
       default:
@@ -307,6 +379,11 @@ const ProblemSolving = () => {
 
             {/* Steps Content */}
             <div className="space-y-6">
+              {!user && (
+                <div className="text-sm text-muted-foreground">
+                  Progress is being saved locally on this device.
+                </div>
+              )}
               {isAdvancingStep && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />

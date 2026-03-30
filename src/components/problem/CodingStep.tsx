@@ -2,13 +2,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle, Code, Play, Send, Lightbulb } from "lucide-react";
-import { useState } from "react";
+import { CheckCircle, Code, Play, Send, Lightbulb, ExternalLink } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 interface CodingStepProps {
   isActive: boolean;
   isCompleted: boolean;
   onComplete: () => void;
+  leetcodeUrl?: string;
+  autoOpenLeetCode?: boolean;
 }
 
 const starterCode = {
@@ -30,12 +32,19 @@ public:
 };`,
 };
 
-const CodingStep = ({ isActive, isCompleted, onComplete }: CodingStepProps) => {
+const CodingStep = ({ isActive, isCompleted, onComplete, leetcodeUrl, autoOpenLeetCode = false }: CodingStepProps) => {
   const [language, setLanguage] = useState<"python" | "java" | "cpp">("python");
   const [code, setCode] = useState(starterCode.python);
   const [showHint, setShowHint] = useState(false);
   const [output, setOutput] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const hasAutoOpenedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isActive || !autoOpenLeetCode || !leetcodeUrl || hasAutoOpenedRef.current) return;
+    hasAutoOpenedRef.current = true;
+    window.open(leetcodeUrl, "_blank", "noopener,noreferrer");
+  }, [autoOpenLeetCode, isActive, leetcodeUrl]);
 
   const handleLanguageChange = (lang: "python" | "java" | "cpp") => {
     setLanguage(lang);
@@ -104,15 +113,27 @@ const CodingStep = ({ isActive, isCompleted, onComplete }: CodingStepProps) => {
                 </SelectContent>
               </Select>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowHint(!showHint)}
-                className="text-warning"
-              >
-                <Lightbulb className="h-4 w-4 mr-1" />
-                {showHint ? "Hide Hint" : "Show Hint"}
-              </Button>
+              <div className="flex items-center gap-2">
+                {leetcodeUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(leetcodeUrl, "_blank", "noopener,noreferrer")}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-1" />
+                    Open LeetCode Compiler
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowHint(!showHint)}
+                  className="text-warning"
+                >
+                  <Lightbulb className="h-4 w-4 mr-1" />
+                  {showHint ? "Hide Hint" : "Show Hint"}
+                </Button>
+              </div>
             </div>
 
             {/* Hint */}
