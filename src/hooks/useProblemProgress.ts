@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -84,6 +85,39 @@ export const useProblemProgress = (problemId: string) => {
     },
   });
 
+  useEffect(() => {
+    if (!user || !problemId) return;
+
+    const channel = supabase
+      .channel(`problem-progress:${user.id}:${problemId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "problem_progress",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const changedProblemId =
+            typeof payload.new === "object" && payload.new !== null && "problem_id" in payload.new
+              ? String((payload.new as Record<string, unknown>).problem_id ?? "")
+              : typeof payload.old === "object" && payload.old !== null && "problem_id" in payload.old
+                ? String((payload.old as Record<string, unknown>).problem_id ?? "")
+                : "";
+
+          if (!changedProblemId || changedProblemId !== problemId) return;
+          queryClient.invalidateQueries({ queryKey: ["problem-progress", problemId, user.id] });
+          queryClient.invalidateQueries({ queryKey: ["all-problem-progress", user.id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [problemId, queryClient, user]);
+
   return {
     progress,
     isLoading,
@@ -95,6 +129,31 @@ export const useProblemProgress = (problemId: string) => {
 
 export const useAllProgress = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`all-problem-progress:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "problem_progress",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["all-problem-progress", user.id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [queryClient, user]);
 
   return useQuery({
     queryKey: ["all-problem-progress", user?.id],

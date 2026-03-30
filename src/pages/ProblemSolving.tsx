@@ -24,11 +24,12 @@ type LocalStepProgress = {
   completed_steps: number[];
 };
 
-const getLocalProgressKey = (problemId: string) => `problem-solving-progress:${problemId}`;
+const getLocalProgressKey = (problemId: string, scope: string = "guest") =>
+  `problem-solving-progress:${scope}:${problemId}`;
 
-const readLocalProgress = (problemId: string): LocalStepProgress | null => {
+const readLocalProgress = (problemId: string, scope: string = "guest"): LocalStepProgress | null => {
   try {
-    const raw = localStorage.getItem(getLocalProgressKey(problemId));
+    const raw = localStorage.getItem(getLocalProgressKey(problemId, scope));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<LocalStepProgress>;
     return {
@@ -42,9 +43,9 @@ const readLocalProgress = (problemId: string): LocalStepProgress | null => {
   }
 };
 
-const writeLocalProgress = (problemId: string, progress: LocalStepProgress) => {
+const writeLocalProgress = (problemId: string, progress: LocalStepProgress, scope: string = "guest") => {
   try {
-    localStorage.setItem(getLocalProgressKey(problemId), JSON.stringify(progress));
+    localStorage.setItem(getLocalProgressKey(problemId, scope), JSON.stringify(progress));
   } catch {
     // Ignore localStorage failures; DB save still handles persistence for signed-in users.
   }
@@ -68,6 +69,7 @@ const ProblemSolving = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const problemId = id || "1";
+  const localScope = user?.id || "guest";
   const isCompanyRoute = problemId.startsWith("company-");
   const companyRouteId = isCompanyRoute ? Number(problemId.replace("company-", "")) : null;
   const numericProblemId = Number(problemId);
@@ -116,7 +118,7 @@ const ProblemSolving = () => {
     setCompletedSteps([]);
     setInitialized(false);
     setIsAdvancingStep(false);
-  }, [problemId]);
+  }, [problemId, user?.id]);
 
   // Load saved progress after auth state settles to avoid early initialization with stale/null user.
   useEffect(() => {
@@ -125,16 +127,12 @@ const ProblemSolving = () => {
     if (progress) {
       setCurrentStep(progress.current_step || 1);
       setCompletedSteps(progress.completed_steps || []);
-      writeLocalProgress(problemId, {
-        current_step: progress.current_step || 1,
-        completed_steps: progress.completed_steps || [],
-      });
       setInitialized(true);
       return;
     }
 
     if (!isLoading && !user) {
-      const localProgress = readLocalProgress(problemId);
+      const localProgress = readLocalProgress(problemId, localScope);
       if (localProgress) {
         setCurrentStep(localProgress.current_step);
         setCompletedSteps(localProgress.completed_steps);
@@ -144,14 +142,9 @@ const ProblemSolving = () => {
     }
 
     if (!isLoading && user && !progress) {
-      const localProgress = readLocalProgress(problemId);
-      if (localProgress) {
-        setCurrentStep(localProgress.current_step);
-        setCompletedSteps(localProgress.completed_steps);
-      }
       setInitialized(true);
     }
-  }, [authLoading, initialized, isLoading, problemId, progress, user]);
+  }, [authLoading, initialized, isLoading, localScope, problemId, progress, user]);
 
   const totalSteps = 7;
   const progressPercent = (completedSteps.length / totalSteps) * 100;
@@ -170,10 +163,16 @@ const ProblemSolving = () => {
     
     setCompletedSteps(newCompleted);
     setCurrentStep(newStep);
-    writeLocalProgress(problemId, {
-      current_step: newStep,
-      completed_steps: newCompleted,
-    });
+    if (!user) {
+      writeLocalProgress(
+        problemId,
+        {
+          current_step: newStep,
+          completed_steps: newCompleted,
+        },
+        localScope
+      );
+    }
 
     if (!user) return;
 
@@ -189,10 +188,16 @@ const ProblemSolving = () => {
     } catch {
       setCurrentStep(previousStep);
       setCompletedSteps(previousCompleted);
-      writeLocalProgress(problemId, {
-        current_step: previousStep,
-        completed_steps: previousCompleted,
-      });
+      if (!user) {
+        writeLocalProgress(
+          problemId,
+          {
+            current_step: previousStep,
+            completed_steps: previousCompleted,
+          },
+          localScope
+        );
+      }
       toast({
         title: "Could not save progress",
         description: "Step progress was not saved. Please try again.",
@@ -201,7 +206,17 @@ const ProblemSolving = () => {
     } finally {
       setIsAdvancingStep(false);
     }
-  }, [completedSteps, currentStep, isAdvancingStep, problemId, toast, totalSteps, user, updateProgressAsync]);
+  }, [
+    completedSteps,
+    currentStep,
+    isAdvancingStep,
+    localScope,
+    problemId,
+    toast,
+    totalSteps,
+    user,
+    updateProgressAsync,
+  ]);
 
   const getStepStatus = (step: number): "completed" | "active" | "locked" => {
     if (completedSteps.includes(step)) return "completed";
