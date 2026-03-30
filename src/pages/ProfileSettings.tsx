@@ -15,6 +15,11 @@ import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  return "Something went wrong. Please try again.";
+};
+
 const ProfileSettings = () => {
   const { user } = useAuth();
   const { profile, isLoading, updateProfile } = useProfile();
@@ -92,10 +97,10 @@ const ProfileSettings = () => {
         title: "Avatar updated!",
         description: "Your profile picture has been updated.",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Upload failed",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     } finally {
@@ -121,10 +126,10 @@ const ProfileSettings = () => {
         title: "Profile updated!",
         description: "Your profile has been saved.",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Update failed",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     } finally {
